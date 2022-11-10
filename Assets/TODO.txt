@@ -1,0 +1,11 @@
+TODO:
+
+	Bugs:
+* 
+	Performance:
+* Object pooling for compute shaders
+* Object pooling for chunk GameObjects
+* Heightmap
+
+	Features:
+* Add/remove blocks

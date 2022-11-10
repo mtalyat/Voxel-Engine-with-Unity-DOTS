@@ -1,0 +1,79 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel FillArray
+#pragma kernel ClearArray
+
+#include "SimplexNoise.compute"
+
+//struct Voxel {
+//    uint ID;
+//};
+
+RWStructuredBuffer<uint> voxelArray;
+RWStructuredBuffer<uint> count;
+
+float3 chunkPosition;
+float3 seedOffset;
+
+uint chunkWidth;
+uint chunkHeight;
+
+bool generateCaves;
+bool forceFloor;
+
+uint maxHeight;
+uint oceanHeight;
+
+float noiseScale;
+float caveScale;
+float caveThreshold;
+
+int surfaceVoxelID;
+int subSurfaceVoxelID;
+
+int flattenCoord(uint3 idx)
+{
+    return (idx.z * (chunkHeight + 0) + idx.y) * (chunkWidth + 0) + idx.x;
+}
+
+[numthreads(8, 8, 8)]
+void FillArray(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xz >= chunkWidth))
+        return;
+
+    float3 pos = id + chunkPosition + seedOffset;
+    float2 posXZ = pos.xz;
+
+    float height = snoise(posXZ * noiseScale) * maxHeight;
+    uint roundHeight = round(height);
+    uint vox = 0;
+
+    if (pos.y > (float)roundHeight)
+    {
+        voxelArray[flattenCoord(id)] = 0;
+        return;
+    }
+
+    bool isSurfaceBlock = id.y >= roundHeight - 3;
+
+    vox = isSurfaceBlock ? surfaceVoxelID : subSurfaceVoxelID;
+
+    if (generateCaves && snoise(pos * caveScale) > caveThreshold)
+    {
+        vox = 0;
+    }
+
+    if (id.y <= 1 && forceFloor)
+        vox = subSurfaceVoxelID;
+
+    if (vox != 0)
+        count.IncrementCounter();
+
+    voxelArray[flattenCoord(id)] = vox;
+}
+
+[numthreads(8, 8, 8)]
+void ClearArray(uint3 id : SV_DispatchThreadID)
+{
+    voxelArray[flattenCoord(id)] = 0;
+}
